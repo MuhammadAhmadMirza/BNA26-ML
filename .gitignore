@@ -1,1 +1,3 @@
 **/.vscode
+src/generate_dataset.py
+models
