@@ -1,12 +1,13 @@
 """
 Module Checker Script
-Scans directories for model_metrics.json files and calculates scores
+Scans zip files for model_metrics.json files and calculates scores
 based on normalized MSE, MAE, and R2 values for the best 3 models.
 """
 
 import os
 import sys
 import json
+import zipfile
 
 # ============== CONFIGURATION ==============
 # Set this to your target directory path, or leave empty to use command line argument
@@ -53,15 +54,12 @@ def calculate_model_score(model_data: dict) -> float:
     return normalize_mse(mse) + normalize_mae(mae) + normalize_r2(r2)
 
 
-def calculate_directory_score(metrics_path: str) -> float | None:
+def calculate_score_from_data(data: dict) -> float | None:
     """
-    Calculate the total score for a directory based on its model_metrics.json.
+    Calculate the total score based on model metrics data.
     Returns the sum of scores for the best N models.
     """
     try:
-        with open(metrics_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
         models = data.get("models", {})
         if not models:
             return None
@@ -80,14 +78,40 @@ def calculate_directory_score(metrics_path: str) -> float | None:
         total_score = sum(score for _, score in top_models)
         return total_score
     
-    except (json.JSONDecodeError, FileNotFoundError, KeyError) as e:
-        print(f"Error processing {metrics_path}: {e}")
+    except KeyError as e:
+        print(f"Error processing data: {e}")
+        return None
+
+
+def calculate_zip_score(zip_path: str) -> float | None:
+    """
+    Calculate the total score for a zip file containing model_metrics.json.
+    Returns the sum of scores for the best N models.
+    """
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            # Look for model_metrics.json in the zip (could be at root or in a folder)
+            metrics_file = None
+            for name in zf.namelist():
+                if name.endswith('model_metrics.json'):
+                    metrics_file = name
+                    break
+            
+            if metrics_file is None:
+                return None
+            
+            with zf.open(metrics_file) as f:
+                data = json.load(f)
+                return calculate_score_from_data(data)
+    
+    except (zipfile.BadZipFile, json.JSONDecodeError, KeyError) as e:
+        print(f"Error processing {zip_path}: {e}")
         return None
 
 
 def scan_directory(root_dir: str) -> list[tuple[str, float]]:
     """
-    Scan the root directory for subdirectories containing model_metrics.json.
+    Scan the root directory for zip files containing model_metrics.json.
     Returns a list of (name, score) tuples.
     """
     results = []
@@ -99,18 +123,17 @@ def scan_directory(root_dir: str) -> list[tuple[str, float]]:
     for entry in os.listdir(root_dir):
         entry_path = os.path.join(root_dir, entry)
         
-        if os.path.isdir(entry_path):
-            metrics_path = os.path.join(entry_path, "model_metrics.json")
-            
-            if os.path.isfile(metrics_path):
-                score = calculate_directory_score(metrics_path)
-                if score is not None:
-                    results.append((entry, score))
-                    print(f"Processed: {entry} -> Score: {score:.4f}")
-                else:
-                    print(f"Skipped: {entry} (invalid or empty metrics)")
+        # Check if it's a zip file
+        if os.path.isfile(entry_path) and entry.lower().endswith('.zip'):
+            name = os.path.splitext(entry)[0]  # Remove .zip extension
+            score = calculate_zip_score(entry_path)
+            if score is not None:
+                results.append((name, score))
+                print(f"Processed: {name} -> Score: {score:.4f}")
             else:
-                print(f"Skipped: {entry} (no model_metrics.json found)")
+                print(f"Skipped: {name} (invalid or no model_metrics.json found)")
+    
+    return results
     
     return results
 
@@ -146,7 +169,7 @@ def main():
     results = scan_directory(target_dir)
     
     if not results:
-        print("No valid model_metrics.json files found in subdirectories.")
+        print("No valid model_metrics.json files found in zip files.")
         sys.exit(1)
     
     # Write results to file in the root directory
