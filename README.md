@@ -53,7 +53,7 @@ Once you're satisfied with your results:
 
 If you need to set up the environment again:
 
-```
+```bash
 git clone <repository-url>
 cd BNA26-ML
 pip install -r requirements.txt
