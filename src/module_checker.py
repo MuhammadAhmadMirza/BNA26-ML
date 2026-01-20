@@ -173,7 +173,7 @@ def main():
         sys.exit(1)
     
     # Write results to file in the root directory
-    output_path = os.path.join(target_dir, "results.txt")
+    output_path = os.path.join(target_dir, "../results/results.txt")
     write_results(results, output_path)
     
     # Print summary
