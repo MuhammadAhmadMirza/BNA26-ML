@@ -11,7 +11,7 @@ import zipfile
 
 # ============== CONFIGURATION ==============
 # Set this to your target directory path, or leave empty to use command line argument
-DIRECTORY_PATH = ""
+DIRECTORY_PATH = "./results"
 
 # Normalization bounds
 MSE_MIN = 740
